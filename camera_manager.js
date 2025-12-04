@@ -34,9 +34,7 @@ export class CameraManager {
         this.camera.lookAt(this.cameraLookAt);
     }
 
-    updateCrashZoom(dt, carPos, explosionTriggered, explosionTime, clock, trackManager, scene) {
-        const timeSinceExplosion = explosionTriggered ? (clock.getElapsedTime() - explosionTime) : 0;
-
+    updateCrashZoom(dt, carPos, explosionTriggered, timeSinceExplosion, trackManager, scene) {
         // Wait 1.0 second before zooming out
         const shouldZoomOut = explosionTriggered && timeSinceExplosion > 1.0;
 
@@ -77,14 +75,13 @@ export class CameraManager {
                     startLookAt: this.cameraLookAt.clone(),
                     targetPos: targetPos,
                     targetLookAt: targetLookAt,
-                    startTime: clock.getElapsedTime(),
-                    duration: 4.0 // 4 seconds for a fluid cinematic movement
+                    startRelTime: timeSinceExplosion, // Start at current relative time
+                    duration: 4.0 
                 };
             }
 
             // Perform Interpolation
-            const now = clock.getElapsedTime();
-            const elapsed = now - this.zoomTransition.startTime;
+            const elapsed = timeSinceExplosion - this.zoomTransition.startRelTime;
             const progress = Math.min(elapsed / this.zoomTransition.duration, 1.0);
 
             // Smootherstep for "start slow, accelerate, decelerate"

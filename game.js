@@ -158,7 +158,7 @@ export class Game {
 
         this.trackManager = new TrackManager(this.scene);
         this.car = new Car(this.scene);
-        this.replaySystem = new ReplaySystem(this.car, this.trackManager, this.cameraManager);
+        this.replaySystem = new ReplaySystem(this.car, this.trackManager, this.cameraManager, this.scene);
         
         // Reset camera
         // removed local camera reset logic
