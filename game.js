@@ -223,12 +223,13 @@ export class Game {
         }
 
         // Camera follow logic
+        const timeSinceExplosion = this.explosionTriggered ? (this.clock.getElapsedTime() - this.explosionTime) : 0;
+        
         this.cameraManager.updateCrashZoom(
             dt, 
             this.car.position, 
             this.explosionTriggered, 
-            this.explosionTime, 
-            this.clock, 
+            timeSinceExplosion, 
             this.trackManager,
             this.scene
         );
@@ -237,6 +238,9 @@ export class Game {
     triggerExplosion() {
         this.explosionTriggered = true;
         this.explosionTime = this.clock.getElapsedTime();
+
+        // Mark in recorder
+        this.recorder.markExplosion();
 
         // Spawn Explosion at current car position
         const explosion = new Explosion(this.scene, this.car.position.clone());
@@ -251,7 +255,7 @@ export class Game {
         // Delay showing game over overlay so explosion is visible
         setTimeout(() => {
             this.showGameOverScreen();
-        }, 3000); // Reduced delay slightly
+        }, 5000); // Allow for full zoom out
     }
 
     async showGameOverScreen() {
@@ -405,6 +409,7 @@ export class Game {
         } 
         else if (this.isCrashing) {
             this.updateCrash(dt);
+            this.recorder.recordFrame(this.car);
         }
         else if (this.isReplaying) {
             // Replay Mode
