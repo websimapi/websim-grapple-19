@@ -80,6 +80,20 @@ export class Game {
         this.explosionTriggered = false;
         this.explosionTime = 0;
         this.interceptorSpawned = false;
+
+        // Check for replay URL in query params
+        const urlParams = new URLSearchParams(window.location.search);
+        const renderUrl = urlParams.get('render');
+        if (renderUrl) {
+            setTimeout(() => this.loadReplayFromURL(renderUrl), 100);
+        }
+
+        // Listen for external render commands
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.render) {
+                this.loadReplayFromURL(event.data.render);
+            }
+        });
     }
 
     // removed setupAudio() {}
@@ -246,11 +260,35 @@ export class Game {
         // Stop recording
         const replayData = this.recorder.stop(this.trackManager);
         
-        // Send High Score
+        // Send High Score (Async upload)
         this.postHighScore(replayData);
 
         // Start Background Replay
         this.startBackgroundReplay(replayData);
+    }
+
+    async loadReplayFromURL(url) {
+        try {
+            console.log("Loading replay from:", url);
+            const response = await fetch(url);
+            if (!response.ok) throw new Error("Network response was not ok");
+            const data = await response.json();
+
+            // Force reset to clear any current game state and setup scene
+            this.reset();
+            this.isRunning = false; // Stop game loop immediately, we only want replay
+            
+            // Hide UI elements
+            const startScreen = document.getElementById('start-screen');
+            if (startScreen) startScreen.classList.add('hidden');
+            this.gameOverScreen.classList.add('hidden');
+            document.getElementById('ui-layer').style.display = 'none';
+
+            this.startBackgroundReplay(data);
+
+        } catch (e) {
+            console.error("Failed to load replay:", e);
+        }
     }
 
     startBackgroundReplay(data) {
@@ -284,17 +322,23 @@ export class Game {
                 }
             }
 
-            // No upload needed, just sending JSON payload
+            // Upload replay JSON
+            const jsonString = JSON.stringify(replayData);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const file = new File([blob], "replay.json", { type: "application/json" });
+            
+            const replayUrl = await websim.upload(file);
+
             const message = {
                 userid: userid,
                 username: username,
                 score: [Math.floor(this.distanceTraveled), this.car.grappleCount],
-                replay: replayData
+                replay: replayUrl
             };
 
             if (window.parent) {
                 window.parent.postMessage(message, '*');
-                console.log("High Score Posted with JSON Replay", message);
+                console.log("High Score Posted with Replay URL", message);
             }
 
         } catch (e) {
