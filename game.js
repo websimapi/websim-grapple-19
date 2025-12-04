@@ -89,6 +89,22 @@ export class Game {
                 this.loadReplayFromURL(event.data.render);
             }
         });
+
+        // Detect render-mode from URL
+        this.isRenderMode = !!new URLSearchParams(window.location.search).get('render');
+        if (this.isRenderMode) {
+            const toggleHandler = (e) => {
+                // Only toggle when a replay is active
+                if (this.isReplaying && this.replaySystem) {
+                    this.replaySystem.togglePause();
+                }
+            };
+            this.renderer.domElement.addEventListener('click', toggleHandler);
+            this.renderer.domElement.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                toggleHandler(e);
+            }, { passive: false });
+        }
     }
 
     // removed setupAudio() {}

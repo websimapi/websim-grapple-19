@@ -93,6 +93,11 @@ export class ReplaySystem {
         this.interceptorSpawned = false;
         this.interceptorMesh = null;
     }
+    
+    togglePause() {
+        if (!this.data) return;
+        this.isPlaying = !this.isPlaying;
+    }
 
     load(jsonData) {
         this.data = jsonData;
