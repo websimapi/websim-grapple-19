@@ -1,5 +1,11 @@
 import { Game } from './game.js';
 
+// Prevent flash: Menu is hidden by CSS default. Show it only if NOT in render mode.
+if (!new URLSearchParams(window.location.search).has('render')) {
+    const s = document.getElementById('start-screen');
+    if (s) s.style.display = 'flex';
+}
+
 window.onload = () => {
     const game = new Game();
     const startScreen = document.getElementById('start-screen');
