@@ -113,9 +113,21 @@ export class ReplaySystem {
         this.explosions = [];
 
         // Initial state
+        this.initializePlayback();
+    }
+
+    initializePlayback() {
         if (this.data.frames.length > 0) {
+            // Setup start state
             this.applyFrame(this.data.frames[0]);
             this.cameraManager.reset(this.car.position);
+            
+            // Use frame 0 as the "previous" frame for the first segment
+            this.prevFrameData = this.data.frames[0];
+        } else {
+             // Fallback
+            this.prevFrameData = this.car.getFrameData(); 
+            this.prevFrameData.push(0.016); // Dummy DT
         }
     }
 
@@ -127,48 +139,83 @@ export class ReplaySystem {
 
         this.accumulatedTime += dt;
 
-        // Process frames to catch up to accumulated time
         let framesProcessed = 0;
-        
-        // Safety Break (max 10 frames per tick to prevent freeze on lag)
-        while (this.currentFrameIndex < this.data.frames.length && framesProcessed < 10) {
+        const maxFramesPerTick = 10;
+
+        // Catch up logic: Advance frames if accumulated time exceeds frame duration
+        while (this.currentFrameIndex < this.data.frames.length && framesProcessed < maxFramesPerTick) {
             const frameData = this.data.frames[this.currentFrameIndex];
-            
-            // Backward compatibility: If no dt stored (old replays), assume 60fps
             const frameDuration = (frameData.length > 11) ? frameData[11] : 0.0166;
 
             if (this.accumulatedTime >= frameDuration) {
                 this.accumulatedTime -= frameDuration;
                 
-                // EVENTS: Spawn, Audio, Explosion
-                this.handleEvents(dt); // Passing dt mostly for explosion update logic if needed
+                // Events (Audio, Spawn, etc)
+                this.handleEvents();
                 
-                // APPLY STATE
-                this.applyFrame(frameData);
-
+                // Advance
+                this.prevFrameData = frameData;
                 this.currentFrameIndex++;
                 framesProcessed++;
             } else {
-                // We don't have enough time accumulator to show the *next* frame yet.
-                // Keep showing the current state (interpolated ideally, but stepped for now)
-                
-                // Force apply current frame again to ensure smooth updates if we aren't advancing
-                // (Mostly to ensure Interceptor overrides are applied every frame against SpaceEnv)
-                if (framesProcessed === 0) {
-                     this.applyFrame(frameData);
-                     // Events for continuous things (Explosions) still need updates
-                     this.updateContinuousEffects(dt);
-                }
                 break;
             }
         }
         
-        if (framesProcessed >= 10) {
-            // We are lagging too much, snap to current
-            this.accumulatedTime = 0;
+        if (framesProcessed >= maxFramesPerTick) {
+            this.accumulatedTime = 0; // Prevent spiral
         }
+
+        // Render Interpolation
+        if (this.currentFrameIndex < this.data.frames.length) {
+            const nextFrameData = this.data.frames[this.currentFrameIndex];
+            const frameDuration = (nextFrameData.length > 11) ? nextFrameData[11] : 0.0166;
+            
+            const alpha = frameDuration > 0.00001 ? (this.accumulatedTime / frameDuration) : 1.0;
+            
+            // Interpolate Car
+            this.car.applyInterpolatedFrame(this.prevFrameData, nextFrameData, alpha);
+
+            // Interpolate Interceptor (if present in target frame)
+            this.applyInterceptorInterpolation(this.prevFrameData, nextFrameData, alpha);
+        } else {
+            // End of replay
+            this.resetLoop();
+            return;
+        }
+
+        this.updateContinuousEffects(dt);
     }
     
+    applyInterceptorInterpolation(dataA, dataB, alpha) {
+        // Interceptor data: Index 12=flag, 13,14,15 = x,y,z
+        const hasB = dataB.length > 12 && dataB[12] === 1;
+        
+        if (hasB) {
+            // Ensure mesh exists
+            if (!this.interceptorMesh && this.spaceEnvironment) {
+                // Maybe it just spawned or we missed the spawn frame ref
+                const found = this.spaceEnvironment.asteroids.find(a => a.isInterceptor);
+                if (found) this.interceptorMesh = found.mesh;
+            }
+
+            if (this.interceptorMesh) {
+                const posB = new THREE.Vector3(dataB[13], dataB[14], dataB[15]);
+                
+                // Check if A also has it for interpolation
+                const hasA = dataA.length > 12 && dataA[12] === 1;
+                
+                if (hasA) {
+                    const posA = new THREE.Vector3(dataA[13], dataA[14], dataA[15]);
+                    this.interceptorMesh.position.lerpVectors(posA, posB, alpha);
+                } else {
+                    // Just snap to B (just spawned)
+                    this.interceptorMesh.position.copy(posB);
+                }
+            }
+        }
+    }
+
     resetLoop() {
         this.currentFrameIndex = 0;
         this.accumulatedTime = 0;
@@ -188,32 +235,20 @@ export class ReplaySystem {
 
         this.car.mesh.visible = true;
 
-        if (this.data && this.data.frames.length > 0) {
-             this.applyFrame(this.data.frames[0]);
-             this.cameraManager.reset(this.car.position);
+        if (this.data) {
+             this.initializePlayback();
         }
     }
 
-    handleEvents(dt) {
+    handleEvents() {
         const frameData = this.data.frames[this.currentFrameIndex];
-        const prevGrappleState = this.car.grappleState;
-        
-        // We peek at next state in applyFrame, but we need to check transitions.
-        // Since we are iterating, 'this.car.grappleState' is currently the *previous* frame's state
-        // because we haven't called applyFrame yet for this index in the loop logic above?
-        // Wait, loop structure: check time -> handleEvents -> applyFrame -> increment.
-        // Yes. So this.car is currently at (currentFrameIndex - 1).
-
-        // Audio Triggers
-        // We need to know what the NEW state will be to detect transition
-        // frameData[10] is state index
         const newStateIndex = frameData[10];
-        let newGrappleState = 'IDLE';
-        if (newStateIndex === 1) newGrappleState = 'FIRING';
+        const oldStateIndex = this.prevFrameData ? this.prevFrameData[10] : 0;
         
         if (this.audioManager) {
-            if (newGrappleState === 'FIRING' && prevGrappleState === 'IDLE') {
-                this.audioManager.playGrapple();
+            // IDLE (0) -> FIRING (1)
+            if (newStateIndex === 1 && oldStateIndex === 0) {
+                 this.audioManager.playGrapple();
             }
             this.audioManager.playEngine();
         }
@@ -235,8 +270,6 @@ export class ReplaySystem {
         if (this.explosionFrame !== -1 && this.currentFrameIndex === this.explosionFrame) {
             this.triggerExplosion();
         }
-        
-        this.updateContinuousEffects(dt);
     }
     
     updateContinuousEffects(dt) {

@@ -78,13 +78,52 @@ export class Car {
         this.hookPosition.set(data[7], data[8], data[9]);
         
         const s = data[10];
+        this.setGrappleStateFromIndex(s);
+
+        // Update Visuals manually
+        this.updateGrappleVisuals();
+    }
+
+    applyInterpolatedFrame(dataA, dataB, t) {
+        // Position
+        this.position.lerpVectors(
+            new THREE.Vector3(dataA[0], dataA[1], dataA[2]),
+            new THREE.Vector3(dataB[0], dataB[1], dataB[2]),
+            t
+        );
+        this.mesh.position.copy(this.position);
+
+        // Quaternion
+        const qA = new THREE.Quaternion(dataA[3], dataA[4], dataA[5], dataA[6]);
+        const qB = new THREE.Quaternion(dataB[3], dataB[4], dataB[5], dataB[6]);
+        this.mesh.quaternion.slerpQuaternions(qA, qB, t);
+
+        // Hook Position
+        const hA = new THREE.Vector3(dataA[7], dataA[8], dataA[9]);
+        const hB = new THREE.Vector3(dataB[7], dataB[8], dataB[9]);
+        this.hookPosition.lerpVectors(hA, hB, t);
+
+        // State Logic: Ensure rope is visible during transitions to/from IDLE
+        const sA = dataA[10];
+        const sB = dataB[10];
+        
+        // If either state is non-idle, show the grapple (prevent flickering)
+        if (sA !== 0 || sB !== 0) {
+            // Prioritize the active state
+            const activeState = sB !== 0 ? sB : sA;
+            this.setGrappleStateFromIndex(activeState);
+        } else {
+            this.setGrappleStateFromIndex(0);
+        }
+
+        this.updateGrappleVisuals();
+    }
+
+    setGrappleStateFromIndex(s) {
         if (s === 0) this.grappleState = 'IDLE';
         else if (s === 1) this.grappleState = 'FIRING';
         else if (s === 2) this.grappleState = 'ATTACHED';
         else if (s === 3) this.grappleState = 'RETRACTING';
-
-        // Update Visuals manually
-        this.updateGrappleVisuals();
     }
 
     updateGrappleVisuals() {
