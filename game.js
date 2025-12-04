@@ -158,7 +158,7 @@ export class Game {
 
         this.trackManager = new TrackManager(this.scene);
         this.car = new Car(this.scene);
-        this.replaySystem = new ReplaySystem(this.car, this.trackManager, this.cameraManager, this.scene, this.spaceEnvironment);
+        this.replaySystem = new ReplaySystem(this.car, this.trackManager, this.cameraManager, this.scene, this.spaceEnvironment, this.audioManager);
         
         // Reset camera
         // removed local camera reset logic
@@ -191,6 +191,10 @@ export class Game {
         this.fallVelocity = this.car.direction.clone().multiplyScalar(20);
         this.fallVelocity.y = -10;
 
+        // Force detach grapple so it doesn't look weird during fall in replay
+        this.car.grappleState = 'IDLE';
+        this.car.updateGrappleVisuals();
+
         this.audioManager.stopEngine();
     }
 
@@ -209,8 +213,8 @@ export class Game {
 
             // Spawn Interceptor if falling deep enough
             if (!this.interceptorSpawned && this.car.position.y < -5) {
-                this.spaceEnvironment.spawnInterceptor(this.car.position, this.fallVelocity);
-                this.recorder.recordInterceptor(this.car.position, this.fallVelocity);
+                const asteroid = this.spaceEnvironment.spawnInterceptor(this.car.position, this.fallVelocity);
+                this.recorder.recordInterceptor(asteroid.mesh.position, asteroid.velocity);
                 this.interceptorSpawned = true;
             }
 
@@ -275,6 +279,7 @@ export class Game {
 
     async loadReplayFromURL(url) {
         try {
+            this.audioManager.resumeContext();
             console.log("Loading replay from:", url);
             const response = await fetch(url);
             if (!response.ok) throw new Error("Network response was not ok");

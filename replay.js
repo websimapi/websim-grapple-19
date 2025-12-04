@@ -29,12 +29,12 @@ export class ActionRecorder {
         }
     }
 
-    recordInterceptor(targetPos, targetVel) {
+    recordInterceptor(pos, vel) {
         if (!this.isRecording) return;
         this.interceptorData = {
             frame: this.frames.length,
-            targetPos: { x: targetPos.x, y: targetPos.y, z: targetPos.z },
-            targetVel: { x: targetVel.x, y: targetVel.y, z: targetVel.z }
+            pos: { x: pos.x, y: pos.y, z: pos.z },
+            vel: { x: vel.x, y: vel.y, z: vel.z }
         };
     }
 
@@ -53,12 +53,13 @@ export class ActionRecorder {
 }
 
 export class ReplaySystem {
-    constructor(car, trackManager, cameraManager, scene, spaceEnvironment) {
+    constructor(car, trackManager, cameraManager, scene, spaceEnvironment, audioManager) {
         this.car = car;
         this.trackManager = trackManager;
         this.cameraManager = cameraManager;
         this.scene = scene;
         this.spaceEnvironment = spaceEnvironment;
+        this.audioManager = audioManager;
         
         this.data = null;
         this.isPlaying = false;
@@ -110,6 +111,8 @@ export class ReplaySystem {
             }
             if (this.spaceEnvironment) this.spaceEnvironment.reset();
 
+            if (this.audioManager) this.audioManager.stopEngine();
+
             this.car.mesh.visible = true; // Show car again if it was hidden by explosion
 
             // Reset camera on loop
@@ -125,16 +128,28 @@ export class ReplaySystem {
 
         // Apply Frame Data
         const frameData = this.data.frames[this.currentFrameIndex];
+        const prevGrappleState = this.car.grappleState;
         this.car.applyFrameData(frameData);
+
+        // Audio Triggers
+        if (this.audioManager) {
+            // Grapple Fire
+            if (this.car.grappleState === 'FIRING' && prevGrappleState === 'IDLE') {
+                this.audioManager.playGrapple();
+            }
+            // Engine Loop (ensure it's playing if not already)
+            this.audioManager.playEngine();
+        }
 
         // Check for Interceptor Spawn
         if (this.interceptorData && !this.interceptorSpawned && this.currentFrameIndex === this.interceptorData.frame) {
             if (this.spaceEnvironment) {
-                const p = this.interceptorData.targetPos;
-                const v = this.interceptorData.targetVel;
+                const p = this.interceptorData.pos;
+                const v = this.interceptorData.vel;
                 const pos = new THREE.Vector3(p.x, p.y, p.z);
                 const vel = new THREE.Vector3(v.x, v.y, v.z);
-                this.spaceEnvironment.spawnInterceptor(pos, vel);
+                // Pass as overrides (targetPos/Vel can be dummy or same)
+                this.spaceEnvironment.spawnInterceptor(pos, vel, pos, vel);
             }
             this.interceptorSpawned = true;
         }
@@ -177,5 +192,6 @@ export class ReplaySystem {
         this.car.hide(); // Hide car mesh
         const explosion = new Explosion(this.scene, this.car.position.clone());
         this.explosions.push(explosion);
+        if (this.audioManager) this.audioManager.playSkid(true);
     }
 }

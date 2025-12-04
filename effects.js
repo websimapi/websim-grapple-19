@@ -370,10 +370,15 @@ export class SpaceEnvironment {
         }
     }
 
-    spawnInterceptor(targetPos, targetVel) {
+    spawnInterceptor(targetPos, targetVel, overridePos = null, overrideVel = null) {
         const wrapper = this.createAsteroid(0, true, targetPos, targetVel);
+        
+        if (overridePos) wrapper.mesh.position.copy(overridePos);
+        if (overrideVel) wrapper.velocity.copy(overrideVel);
+
         this.scene.add(wrapper.mesh);
         this.asteroids.push(wrapper);
+        return wrapper;
     }
 
     spawnAsteroidField(centerPos) {
