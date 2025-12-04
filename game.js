@@ -17,6 +17,7 @@ export class Game {
         this.grappleScoreEl = document.getElementById('grapple-display');
         this.gameOverScreen = document.getElementById('game-over-screen');
         this.finalScoreEl = document.getElementById('final-score');
+        this.uiLayer = document.getElementById('ui-layer');
 
         this.scene = new THREE.Scene();
         this.scene.fog = new THREE.FogExp2(0x050505, 0.002);
@@ -107,6 +108,7 @@ export class Game {
 
     start() {
         this.audioManager.resumeContext();
+        if (this.uiLayer) this.uiLayer.style.display = 'block';
         this.reset();
         if (!this.loopStarted) this.loop();
     }
@@ -288,7 +290,7 @@ export class Game {
             const startScreen = document.getElementById('start-screen');
             if (startScreen) startScreen.classList.add('hidden');
             this.gameOverScreen.classList.add('hidden');
-            document.getElementById('ui-layer').style.display = 'none';
+            if (this.uiLayer) this.uiLayer.style.display = 'none';
 
             this.startBackgroundReplay(data);
 
