@@ -7,6 +7,7 @@ export class ActionRecorder {
         this.trackData = [];
         this.isRecording = false;
         this.explosionFrame = -1;
+        this.interceptorData = null;
     }
 
     start(trackManager) {
@@ -14,6 +15,7 @@ export class ActionRecorder {
         this.trackData = []; 
         this.isRecording = true;
         this.explosionFrame = -1;
+        this.interceptorData = null;
     }
 
     recordFrame(car) {
@@ -27,6 +29,15 @@ export class ActionRecorder {
         }
     }
 
+    recordInterceptor(targetPos, targetVel) {
+        if (!this.isRecording) return;
+        this.interceptorData = {
+            frame: this.frames.length,
+            targetPos: { x: targetPos.x, y: targetPos.y, z: targetPos.z },
+            targetVel: { x: targetVel.x, y: targetVel.y, z: targetVel.z }
+        };
+    }
+
     stop(trackManager) {
         this.isRecording = false;
         // Capture total track state
@@ -35,17 +46,19 @@ export class ActionRecorder {
         return {
             track: this.trackData,
             frames: this.frames,
-            explosionFrame: this.explosionFrame
+            explosionFrame: this.explosionFrame,
+            interceptorData: this.interceptorData
         };
     }
 }
 
 export class ReplaySystem {
-    constructor(car, trackManager, cameraManager, scene) {
+    constructor(car, trackManager, cameraManager, scene, spaceEnvironment) {
         this.car = car;
         this.trackManager = trackManager;
         this.cameraManager = cameraManager;
         this.scene = scene;
+        this.spaceEnvironment = spaceEnvironment;
         
         this.data = null;
         this.isPlaying = false;
@@ -54,12 +67,18 @@ export class ReplaySystem {
         this.timeSinceExplosion = 0;
         this.hasExploded = false;
         this.explosions = []; // Keep track to update/cleanup
+        this.interceptorData = null;
+        this.interceptorSpawned = false;
     }
 
     load(jsonData) {
         this.data = jsonData;
         this.explosionFrame = typeof jsonData.explosionFrame === 'number' ? jsonData.explosionFrame : -1;
+        this.interceptorData = jsonData.interceptorData || null;
+        this.interceptorSpawned = false;
         
+        if (this.spaceEnvironment) this.spaceEnvironment.reset();
+
         // Rebuild Track
         this.trackManager.rebuildFromHistory(this.data.track);
         this.currentFrameIndex = 0;
@@ -81,6 +100,7 @@ export class ReplaySystem {
             this.currentFrameIndex = 0;
             this.timeSinceExplosion = 0;
             this.hasExploded = false;
+            this.interceptorSpawned = false;
             
             // Clean up explosions
             while(this.explosions.length > 0) {
@@ -88,6 +108,8 @@ export class ReplaySystem {
                 this.scene.remove(exp.mesh);
                 this.scene.remove(exp.light);
             }
+            if (this.spaceEnvironment) this.spaceEnvironment.reset();
+
             this.car.mesh.visible = true; // Show car again if it was hidden by explosion
 
             // Reset camera on loop
@@ -104,6 +126,18 @@ export class ReplaySystem {
         // Apply Frame Data
         const frameData = this.data.frames[this.currentFrameIndex];
         this.car.applyFrameData(frameData);
+
+        // Check for Interceptor Spawn
+        if (this.interceptorData && !this.interceptorSpawned && this.currentFrameIndex === this.interceptorData.frame) {
+            if (this.spaceEnvironment) {
+                const p = this.interceptorData.targetPos;
+                const v = this.interceptorData.targetVel;
+                const pos = new THREE.Vector3(p.x, p.y, p.z);
+                const vel = new THREE.Vector3(v.x, v.y, v.z);
+                this.spaceEnvironment.spawnInterceptor(pos, vel);
+            }
+            this.interceptorSpawned = true;
+        }
 
         // Check for Explosion
         if (this.explosionFrame !== -1 && this.currentFrameIndex === this.explosionFrame) {

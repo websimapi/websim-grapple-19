@@ -158,7 +158,7 @@ export class Game {
 
         this.trackManager = new TrackManager(this.scene);
         this.car = new Car(this.scene);
-        this.replaySystem = new ReplaySystem(this.car, this.trackManager, this.cameraManager, this.scene);
+        this.replaySystem = new ReplaySystem(this.car, this.trackManager, this.cameraManager, this.scene, this.spaceEnvironment);
         
         // Reset camera
         // removed local camera reset logic
@@ -210,6 +210,7 @@ export class Game {
             // Spawn Interceptor if falling deep enough
             if (!this.interceptorSpawned && this.car.position.y < -5) {
                 this.spaceEnvironment.spawnInterceptor(this.car.position, this.fallVelocity);
+                this.recorder.recordInterceptor(this.car.position, this.fallVelocity);
                 this.interceptorSpawned = true;
             }
 
