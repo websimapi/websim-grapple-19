@@ -82,13 +82,6 @@ export class Game {
         this.explosionTime = 0;
         this.interceptorSpawned = false;
 
-        // Check for replay URL in query params
-        const urlParams = new URLSearchParams(window.location.search);
-        const renderUrl = urlParams.get('render');
-        if (renderUrl) {
-            setTimeout(() => this.loadReplayFromURL(renderUrl), 100);
-        }
-
         // Listen for external render commands
         window.addEventListener('message', (event) => {
             if (event.data && event.data.render) {
