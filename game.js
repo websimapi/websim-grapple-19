@@ -83,6 +83,11 @@ export class Game {
         this.explosionTime = 0;
         this.interceptorSpawned = false;
 
+        // Render / replay UI refs
+        this.renderOverlay = document.getElementById('render-start-screen');
+        this.renderPlayBtn = document.getElementById('play-render-btn');
+        this.replayLoaded = false;
+
         // Listen for external render commands
         window.addEventListener('message', (event) => {
             if (event.data && event.data.render) {
@@ -96,7 +101,20 @@ export class Game {
             const toggleHandler = (e) => {
                 // Only toggle when a replay is active
                 if (this.isReplaying && this.replaySystem) {
-                    this.replaySystem.togglePause();
+                    if (this.replaySystem.isPlaying) {
+                        // Pause and show overlay play button
+                        this.replaySystem.isPlaying = false;
+                        if (this.renderOverlay) {
+                            this.renderOverlay.classList.remove('hidden');
+                            this.renderOverlay.style.display = 'flex';
+                        }
+                    } else {
+                        // Resume from current frame and hide overlay
+                        this.replaySystem.isPlaying = true;
+                        if (this.renderOverlay) {
+                            this.renderOverlay.classList.add('hidden');
+                        }
+                    }
                 }
             };
             this.renderer.domElement.addEventListener('click', toggleHandler);
@@ -309,6 +327,7 @@ export class Game {
             if (this.uiLayer) this.uiLayer.style.display = 'none';
 
             this.startBackgroundReplay(data);
+            this.replayLoaded = true;
 
             // Ensure loop is running if triggered from URL (bypassing start screen)
             if (!this.loopStarted) this.loop();
@@ -332,6 +351,17 @@ export class Game {
         this.car.mesh.visible = true; // Show car again
         
         this.replaySystem.load(data);
+    }
+
+    // Handle blue play button behavior in render= mode
+    handleRenderPlayButton(url) {
+        if (!this.replayLoaded) {
+            // First time: load and start replay
+            this.loadReplayFromURL(url);
+        } else if (this.replaySystem) {
+            // Already loaded: just resume from current frame
+            this.replaySystem.isPlaying = true;
+        }
     }
 
     async postHighScore(replayData) {

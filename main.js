@@ -31,8 +31,8 @@ window.onload = () => {
         if (renderBtn) {
             renderBtn.addEventListener('click', () => {
                 if (renderScreen) renderScreen.classList.add('hidden');
-                // Start replay logic which includes resuming audio context
-                game.loadReplayFromURL(renderUrl);
+                // Delegate to game so it can either load or resume replay
+                game.handleRenderPlayButton(renderUrl);
             });
         }
     } else {
