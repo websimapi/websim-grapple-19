@@ -55,6 +55,7 @@ export class Game {
         window.addEventListener('resize', () => this.onWindowResize());
 
         // Game State
+        this.loopStarted = false;
         this.isRunning = false;
         this.isCrashing = false;
         this.distanceTraveled = 0;
@@ -114,7 +115,7 @@ export class Game {
     start() {
         this.audioManager.resumeContext();
         this.reset();
-        this.loop();
+        if (!this.loopStarted) this.loop();
     }
 
     reset() {
@@ -286,6 +287,9 @@ export class Game {
 
             this.startBackgroundReplay(data);
 
+            // Ensure loop is running if triggered from URL (bypassing start screen)
+            if (!this.loopStarted) this.loop();
+
         } catch (e) {
             console.error("Failed to load replay:", e);
         }
@@ -353,6 +357,7 @@ export class Game {
     }
 
     loop() {
+        this.loopStarted = true;
         requestAnimationFrame(() => this.loop());
 
         const dt = Math.min(this.clock.getDelta(), 0.1); 
