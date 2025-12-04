@@ -101,15 +101,16 @@ body {
     background: #0088ff;
     color: white;
     border: none;
-    width: 120px;
-    height: 120px;
+    width: min(120px, 25vmin);
+    height: min(120px, 25vmin);
     border-radius: 50%;
-    font-size: 60px;
+    font-size: min(60px, 12vmin);
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 0;
-    padding-left: 10px; /* Optical center for triangle */
+    padding-left: 0.15em; /* Optical center for triangle */
+    box-sizing: border-box;
     box-shadow: 0 0 40px #0088ff;
     transition: transform 0.2s, box-shadow 0.2s;
     cursor: pointer;
