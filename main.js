@@ -1,5 +1,13 @@
 import { Game } from './game.js';
 
+// Priority: Check render mode immediately to prevent UI flash
+if (new URLSearchParams(window.location.search).get('render')) {
+    const style = document.createElement('style');
+    // Force hide UI layer and Start Screen immediately
+    style.innerHTML = '#ui-layer, #start-screen { display: none !important; }';
+    document.head.appendChild(style);
+}
+
 window.onload = () => {
     const game = new Game();
     
