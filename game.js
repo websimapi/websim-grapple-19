@@ -178,6 +178,7 @@ export class Game {
         // Start new recording
         this.recorder.start(this.trackManager);
 
+        this.activeInterceptor = null;
         this.audioManager.playEngine();
     }
 
@@ -214,6 +215,7 @@ export class Game {
             // Spawn Interceptor if falling deep enough
             if (!this.interceptorSpawned && this.car.position.y < -5) {
                 const asteroid = this.spaceEnvironment.spawnInterceptor(this.car.position, this.fallVelocity);
+                this.activeInterceptor = asteroid;
                 this.recorder.recordInterceptor(asteroid.mesh.position, asteroid.velocity);
                 this.interceptorSpawned = true;
             }
@@ -381,12 +383,19 @@ export class Game {
             }
         }
 
+        // Run Environment Update FIRST so ReplaySystem can override positions if needed
+        if (this.spaceEnvironment) {
+            // In replay mode, we want environment to update normally (stars, background asteroids),
+            // but the interceptor will be strictly controlled by the replay system.
+            this.spaceEnvironment.update(dt, this.camera.position);
+        }
+
         if (this.isRunning) {
             // Update Logic
             this.car.update(dt, this.inputManager, this.trackManager);
 
-            // Record Frame
-            this.recorder.recordFrame(this.car);
+            // Record Frame (with dt and interceptor)
+            this.recorder.recordFrame(this.car, this.activeInterceptor, dt);
 
             // Check Track generation
             const distToHead = this.car.position.distanceTo(this.trackManager.currentPos);
@@ -405,7 +414,6 @@ export class Game {
             this.grappleScoreEl.innerText = `GRAPPLES: ${this.car.grappleCount}`;
 
             // Camera Follow
-            // removed inline camera follow logic
             this.cameraManager.updateFollow(this.car.position, dt);
 
             // SFX Logic
@@ -415,15 +423,11 @@ export class Game {
         } 
         else if (this.isCrashing) {
             this.updateCrash(dt);
-            this.recorder.recordFrame(this.car);
+            this.recorder.recordFrame(this.car, this.activeInterceptor, dt);
         }
         else if (this.isReplaying) {
             // Replay Mode
             this.replaySystem.update(dt);
-        }
-
-        if (this.spaceEnvironment) {
-            this.spaceEnvironment.update(dt, this.camera.position);
         }
 
         this.composer.render();
