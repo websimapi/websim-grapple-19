@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 export class ActionRecorder {
     constructor() {
         this.frames = [];
