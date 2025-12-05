@@ -394,8 +394,29 @@ export class Game {
             };
 
             if (window.parent) {
-                window.parent.postMessage(message, '*');
-                console.log("High Score Posted with Replay URL", message);
+                // Ensure we only send structured-clone-safe data to avoid DataCloneError
+                let safeMessage;
+                try {
+                    safeMessage = JSON.parse(JSON.stringify(message));
+                } catch (cloneErr) {
+                    console.warn("Failed to sanitize high score message, falling back to minimal payload:", cloneErr);
+                    safeMessage = {
+                        userid: String(userid),
+                        username: String(username),
+                        score: [
+                            Number(Math.floor(this.distanceTraveled) || 0),
+                            Number(this.car.grappleCount || 0)
+                        ],
+                        replay: String(replayUrl || "")
+                    };
+                }
+
+                try {
+                    window.parent.postMessage(safeMessage, '*');
+                    console.log("High Score Posted with Replay URL", safeMessage);
+                } catch (postErr) {
+                    console.error("Error posting high score (postMessage failed):", postErr);
+                }
             }
 
         } catch (e) {
